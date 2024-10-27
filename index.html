@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ICACS and SHIM 2024 Talk Timer</title>
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        /* Background image and styling */
+        background-image: url('background.jpg'); /* Using your specified image */
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        position: relative;
+        overflow: hidden;
+    }
+    /* Overlay to improve text readability */
+    #overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.1); /* Semi-transparent black overlay */
+        z-index: 1;
+    }
+    #container {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100%;
+        color: white; /* Text color to stand out against background */
+        text-shadow: 2px 2px 4px #000000; /* Add shadow for better readability */
+        /* Added spacing between elements */
+        justify-content: flex-start;
+        padding-top: 20px;
+    }
+    #timer {
+        font-size: 60vh; /* Increased font size */
+        line-height: 1;
+        color: blue;
+        margin-top: 30px; /* Added margin-top for extra spacing */
+    }
+    #controls {
+        margin-top: 15px;
+        margin-bottom: 20px; /* Added margin-bottom to create space below controls */
+    }
+    .btn {
+        padding: 8px 16px;
+        font-size: 18px;
+        margin: 3px;
+        cursor: pointer;
+    }
+    label, select, input {
+        font-size: 18px;
+    }
+    #fullscreenBtn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 18px;
+        padding: 5px 10px;
+        z-index: 3;
+        cursor: pointer;
+    }
+    h1 {
+        margin-bottom: 5px;
+    }
+    #name, #email {
+        margin: 0;
+        font-size: 16px;
+    }
+    /* Hide scrollbars */
+    ::-webkit-scrollbar {
+        display: none;
+    }
+    /* For Firefox and others */
+    body {
+        scrollbar-width: none;
+    }
+</style>
+</head>
+<body>
+
+<div id="overlay"></div>
+
+<button id="fullscreenBtn">Full Screen</button>
+
+<div id="container">
+    <h1>ICACS and SHIM 2024 Talk Timer</h1>
+    <p id="name">Shankar Dutt</p>
+    <p id="email">shankar.dutt@anu.edu.au</p>
+
+    <div>
+        <label for="talkType">Select Talk Type:</label>
+        <select id="talkType">
+            <option value="invited">Invited Talk (25 mins)</option>
+            <option value="contributed">Contributed Talk (15 mins)</option>
+            <option value="custom">Custom Timer</option>
+        </select>
+    </div>
+
+    <div id="customTimeDiv" style="display:none; margin-top: 10px;">
+        <label for="customTime">Enter time in minutes:</label>
+        <input type="number" id="customTime" min="1" max="120" value="10">
+    </div>
+
+    <div id="controls">
+        <button class="btn" id="startBtn">Start</button>
+        <button class="btn" id="stopBtn">Stop</button>
+        <button class="btn" id="resetBtn">Reset</button>
+    </div>
+
+    <div id="timer">00:00</div>
+</div>
+
+<!-- Include the pre-recorded alarm sound -->
+<audio id="alarmSound" src="alarm.mp3" preload="auto"></audio>
+
+<script>
+let totalTime = 0;
+let remainingTime = 0;
+let intervalId;
+let timerRunning = false;
+
+const timerDisplay = document.getElementById('timer');
+const talkTypeSelect = document.getElementById('talkType');
+const customTimeDiv = document.getElementById('customTimeDiv');
+const customTimeInput = document.getElementById('customTime');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const resetBtn = document.getElementById('resetBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const alarmSound = document.getElementById('alarmSound');
+
+talkTypeSelect.addEventListener('change', function() {
+    if (talkTypeSelect.value === 'custom') {
+        customTimeDiv.style.display = 'block';
+    } else {
+        customTimeDiv.style.display = 'none';
+    }
+});
+
+startBtn.addEventListener('click', function() {
+    if (!timerRunning) {
+        if (talkTypeSelect.value === 'invited') {
+            totalTime = 25 * 60;
+        } else if (talkTypeSelect.value === 'contributed') {
+            totalTime = 15 * 60;
+        } else if (talkTypeSelect.value === 'custom') {
+            let customMinutes = parseInt(customTimeInput.value);
+            if (isNaN(customMinutes) || customMinutes <= 0) {
+                alert('Please enter a valid number of minutes.');
+                return;
+            }
+            totalTime = customMinutes * 60;
+        }
+        remainingTime = totalTime;
+        updateTimerDisplay();
+        timerRunning = true;
+        intervalId = setInterval(countdown, 1000);
+    }
+});
+
+stopBtn.addEventListener('click', function() {
+    clearInterval(intervalId);
+    timerRunning = false;
+});
+
+resetBtn.addEventListener('click', function() {
+    clearInterval(intervalId);
+    timerRunning = false;
+    timerDisplay.style.color = 'blue';
+    timerDisplay.textContent = '00:00';
+});
+
+fullscreenBtn.addEventListener('click', function() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+        fullscreenBtn.textContent = 'Exit Full Screen';
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+            fullscreenBtn.textContent = 'Full Screen';
+        }
+    }
+});
+
+function countdown() {
+    if (!timerRunning) return;
+
+    remainingTime--;
+    updateTimerDisplay();
+
+    // Play sound when time reaches zero
+    if (remainingTime === 0) {
+        playAlarm();
+    }
+}
+
+function updateTimerDisplay() {
+    let absTime = Math.abs(remainingTime);
+    let minutes = Math.floor(absTime / 60);
+    let seconds = absTime % 60;
+    let timeString = 
+        (minutes < 10 ? '0' : '') + minutes + ':' +
+        (seconds < 10 ? '0' : '') + seconds;
+
+    if (remainingTime < 0) {
+        timerDisplay.textContent = '-' + timeString;
+    } else {
+        timerDisplay.textContent = timeString;
+    }
+    updateTimerColor();
+}
+
+function updateTimerColor() {
+    if (remainingTime < 0) {
+        timerDisplay.style.color = 'magenta';
+    } else if (remainingTime <= 60) { // 1 minute left
+        timerDisplay.style.color = 'red';
+    } else if (remainingTime <= 180) { // 3 minutes left
+        timerDisplay.style.color = 'orange';
+    } else {
+        timerDisplay.style.color = 'blue';
+    }
+}
+
+function playAlarm() {
+    // Try to play the pre-recorded alarm sound
+    if (alarmSound) {
+        alarmSound.play().catch((error) => {
+            // If there's an error, fallback to beeps
+            console.error('Error playing alarmSound:', error);
+            playBeep();
+        });
+    } else {
+        playBeep();
+    }
+}
+
+function playBeep() {
+    // Play multiple beeps using Web Audio API
+    if (typeof AudioContext !== "undefined" || typeof webkitAudioContext !== "undefined") {
+        let audioCtx = new (AudioContext || webkitAudioContext)();
+        let duration = 0.2; // duration of each beep
+        let interval = 0.3; // interval between beeps
+        let beeps = 3;      // number of beeps
+        for (let i = 0; i < beeps; i++) {
+            let oscillator = audioCtx.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(1000, audioCtx.currentTime + i * interval);
+            oscillator.connect(audioCtx.destination);
+            oscillator.start(audioCtx.currentTime + i * interval);
+            oscillator.stop(audioCtx.currentTime + i * interval + duration);
+        }
+    } else {
+        alert("Time's up!");
+    }
+}
+</script>
+
+</body>
+</html>
